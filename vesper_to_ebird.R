@@ -42,11 +42,7 @@ dt_format = "%m/%d/%y %H:%M:%S"
 
 # Functions ---------------------------------------------------------------
 
-get_dusk_dawn <- function(x, y) {
-  dusk <- vebird$nautical_dusk[1]
-  dusk <- dusk - hours(1)
-  
-}
+# None yet.
 
 # Read and wrangle the data -----------------------------------------------
 
@@ -62,7 +58,7 @@ get_dusk_dawn <- function(x, y) {
 
 # Hard-coded file name for testing
 vebird <- read_csv(
-  "two_days_out.csv",
+  "two_nights_out.csv",
   skip = 1,
   col_names = c("season", "year", "detector", "species", "site", "date",
                 "recording_start", "recording_length", "detection_time",
@@ -105,6 +101,17 @@ vebird <- vebird |>
       tz = time_zone)
   )
 
+# Shift all times to standard time (CST). Vesper has them in daylight savings time.
+# All dates and times for my purpose occur during CDT.
+
+vebird <- vebird |> 
+  mutate(
+    nautical_dusk = nautical_dusk - hours(1),
+    nautical_dawn = nautical_dawn - hours(1),
+    astronomical_dusk = astronomical_dusk - hours(1),
+    astronomical_dawn = astronomical_dawn - hours(1))
+
+
 # Create a detection time ceiling that should make grouping easier
 
 vebird <- vebird |> 
@@ -129,10 +136,21 @@ vebird <- vebird |>
     )
   )
 
+# Calculate duration for final checklist before nautical dawn.
+vebird <- vebird |> 
+  mutate(duration = if_else(
+    nautical_dawn - start_time < 60,
+    as.character(floor_date(nautical_dawn, "minute") - start_time),
+    duration
+  ))
 
+# Create a text string that adds one hour to start time to coincide with
+# eBird's local time format.
+fred <- vebird |> 
+  mutate(ebird_start_time = start_time + hours(1))
 
 vebird |> 
-  group_by(detection_time_ceiling) |> 
+  group_by(start_time) |> 
   summarise(N = n())
 
 
@@ -180,7 +198,42 @@ col_c <- c(
   notes
 )
 
-tibble(col_a, col_b, col_c)
+
+# Trying to write a function that groups by date and hour.
+# So far, grouping by date and time is okay. Can write one file per date.
+# Need one file per date with "col_d" repeated for each hour.
+ebird_tbl <- function(df, gd, st) {
+  col_d = c(
+    location_name,
+    latitude,
+    longitude,
+    format(gd, "%m/%d/%y"), # this needs to get converted to proper format.Change for each date
+    format(st, "%H:%M"), # use either first_dusk or hour
+    state,
+    country,
+    protocol,
+    num_observers,
+    df$duration[1], # duration is 60 minutes unless first recording or final recording.
+    all_obs_reported,
+    dist_traveled,
+    area_covered,
+    notes
+  )
+  return(tibble(col_a, col_b, col_d))
+}
+
+
+
+x <- vebird %>%
+  group_by(group_date, start_time) %>%
+  group_modify(~ ebird_tbl(.x, gd = .y$group_date, st = .y$start_time))
+
+
+x %>%
+  group_by(group_date) %>%
+  group_walk(~ write_csv(.x, paste0(.y$group_date, "ebird.csv"), col_names = FALSE))
+
+
 
 write_csv(
   tibble(col_a, col_b, col_c), 
