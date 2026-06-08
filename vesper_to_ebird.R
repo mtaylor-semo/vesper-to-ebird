@@ -83,6 +83,11 @@ vebird <- vebird |>
       tz = time_zone)
   )
 
+# Create a detection time ceiling that should make grouping easier
+
+vebird <- vebird |> 
+  mutate(detection_time_ceiling = ceiling_date(real_detection_datetime, "hour"))
+
 
 # Time Buckets ------------------------------------------------------------
 
@@ -107,4 +112,14 @@ first_dusk <- ceiling_date(dusk, "hour")
 last_dawn <- floor_date(dawn, "hour")
 hour_buckets <- seq(first_dusk, last_dawn, by = "hours")
 
+vebird |> 
+  group_by(detection_time_ceiling) |> 
+  summarise(N = n())
 
+
+
+# This from https://stackoverflow.com/a/54807068/3832941
+# Not sure if it will be helpful but saving just in case.
+vebird %>%
+  group_by(detection_time_ceiling) %>%
+  group_walk(~ write_csv(.x, paste0(.y$detection_time_ceiling, "ebird.csv")))
