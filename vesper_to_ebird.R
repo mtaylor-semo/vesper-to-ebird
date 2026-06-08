@@ -14,13 +14,55 @@ library(suncalc)
 
 # Constants ---------------------------------------------------------------
 
-station <- "Miller Reserve"
-site <- "prairie"
+# Most constants are based on eBird's "checklist format" for importing.
+
+location_name <- "Miller Reserve"
+latitude <- 37.132025
+longitude <- -89.461307
+state = "MO" # eBird uses two-letter postal codes
+country = "US" # eBird uses two-letter code for US
+protocol = "P54" # eBird protocol code for NFC
+num_observers <- 1 # Single observer
+duration <- "60"
+all_obs_reported <- "N"
+dist_traveled = 0 # if needed for stationary NFC
+area_covered = 0 # if needed for stationary NFC
+notes = "Recorded using Wildlife Acoustics SM mini with single stub microphone
+at 48kHz, 16 bit mono. NFC calls detected using Vesper (https://github.com/HaroldMills/Vesper) with Nighthawk detector (https://github.com/bmvandoren/Nighthawk) unless noted. Local calls detected manually and with Hawkears (https://github.com/jhuus/HawkEars). This checklist was created automatically using https://github.com/mtaylor-semo/vesper-to-ebird."
+
+# set up data frame. MOVE THIS DOWN
+
+col_a <- c("", "Latitude", "Longitude", "Date", "Start Time", "State",
+           "Country", "Protocol", "Num Observers", "Duration (min)",
+           "All Obs Reported (Y/N)", "Dist Traveled (miles)",
+           "Area Covered (Acres)", "Notes")
+col_b <- c(rep("",14))
+col_c <- c(
+  location_name,
+  latitude,
+  longitude,
+  format(vebird$date[1], "%m/%d/%y"), # this needs to get converted to proper format.Change for each date
+  format(vebird$detection_time_floor[1], "%H:%M"), # use either first_dusk or hour
+  state,
+  country,
+  protocol,
+  num_observers,
+  duration, # duration is 60 minutes unless first recording or final recording.
+  all_obs_reported,
+  dist_traveled,
+  area_covered,
+  notes
+)
+
+write_csv(
+  tibble(col_a, col_b, col_c), 
+  "for_ebird_import.csv",
+  col_names = FALSE)
+
+site <- "prairie" # this is from Vesper, from the name of the specific SMmini recorder
 recorder <- "SMmini"
 mic <- "stub"
 station_info <- ""
-latitude <- 37.132025
-longitude <- -89.461307
   
 time_zone <- "Etc/GMT+6"
 
@@ -86,7 +128,11 @@ vebird <- vebird |>
 # Create a detection time ceiling that should make grouping easier
 
 vebird <- vebird |> 
-  mutate(detection_time_ceiling = ceiling_date(real_detection_datetime, "hour"))
+  mutate(detection_time_floor = floor_date(real_detection_datetime, "hour"))
+
+# Use floor to get start time, then add 60 minutes for duration
+# If floor is less than first_dusk (below), then replace with first dusk and
+# calculate duration.
 
 
 # Time Buckets ------------------------------------------------------------
@@ -123,3 +169,14 @@ vebird |>
 vebird %>%
   group_by(detection_time_ceiling) %>%
   group_walk(~ write_csv(.x, paste0(.y$detection_time_ceiling, "ebird.csv")))
+
+
+
+# Prepare header for csv --------------------------------------------------
+
+# This is the constant information for the Miller Reserve site
+# that will appear at the start of all NFC checklists.  Based on
+# eBird's "checklist format."
+
+
+# Make first rows of eBird checklist format
