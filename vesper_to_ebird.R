@@ -136,29 +136,6 @@ vebird <- vebird |>
 # calculate duration.
 
 
-# Time Buckets ------------------------------------------------------------
-
-# THIS NEEDS TO BE A FUNCTION
-# Time provided by Vesper is local time, so CDT during migration.
-# Convert to CST by subtracting one hour
-
-# Dusk is start of astronomical dusk (end of nautical dusk),
-# the appropriate starting time for eBird NFC
-
-dusk <- vebird$nautical_dusk[1]
-dusk <- dusk - hours(1)
-
-# dawn is end of astronomical dawn (start of nautical dawn),
-# the appropriate end time for eBird NFC
-dawn <- vebird$nautical_dawn[1]
-dawn <- dawn - hours(1)
-
-# Create buckets based on hours. First dusk and last dawn are the first and
-# final buckets at the dusk/dawn boundary.
-first_dusk <- ceiling_date(dusk, "hour")
-last_dawn <- floor_date(dawn, "hour")
-hour_buckets <- seq(first_dusk, last_dawn, by = "hours")
-
 vebird |> 
   group_by(detection_time_ceiling) |> 
   summarise(N = n())
