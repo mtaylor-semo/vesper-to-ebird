@@ -52,3 +52,6 @@ rsconnect/
 # text and csv files
 *.txt
 *.csv
+*.pdf
+*.xls
+*.xlsx
