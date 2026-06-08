@@ -3,7 +3,7 @@
 # javascripts: https://github.com/RichardLitt/vesper-to-ebird
 
 
-# Can I make this run from command line? If so, how to pass options
+# Can I make this run from command line? If so, how to input file
 
 # Libraries ---------------------------------------------------------------
 
@@ -30,43 +30,23 @@ area_covered = 0 # if needed for stationary NFC
 notes = "Recorded using Wildlife Acoustics SM mini with single stub microphone
 at 48kHz, 16 bit mono. NFC calls detected using Vesper (https://github.com/HaroldMills/Vesper) with Nighthawk detector (https://github.com/bmvandoren/Nighthawk) unless noted. Local calls detected manually and with Hawkears (https://github.com/jhuus/HawkEars). This checklist was created automatically using https://github.com/mtaylor-semo/vesper-to-ebird."
 
-# set up data frame. MOVE THIS DOWN
 
-col_a <- c("", "Latitude", "Longitude", "Date", "Start Time", "State",
-           "Country", "Protocol", "Num Observers", "Duration (min)",
-           "All Obs Reported (Y/N)", "Dist Traveled (miles)",
-           "Area Covered (Acres)", "Notes")
-col_b <- c(rep("",14))
-col_c <- c(
-  location_name,
-  latitude,
-  longitude,
-  format(vebird$date[1], "%m/%d/%y"), # this needs to get converted to proper format.Change for each date
-  format(vebird$detection_time_floor[1], "%H:%M"), # use either first_dusk or hour
-  state,
-  country,
-  protocol,
-  num_observers,
-  duration, # duration is 60 minutes unless first recording or final recording.
-  all_obs_reported,
-  dist_traveled,
-  area_covered,
-  notes
-)
+# site <- "prairie" # this is from Vesper, from the name of the specific SMmini recorder
+# recorder <- "SMmini"
+# mic <- "stub"
+# station_info <- ""
 
-write_csv(
-  tibble(col_a, col_b, col_c), 
-  "for_ebird_import.csv",
-  col_names = FALSE)
-
-site <- "prairie" # this is from Vesper, from the name of the specific SMmini recorder
-recorder <- "SMmini"
-mic <- "stub"
-station_info <- ""
-  
 time_zone <- "Etc/GMT+6"
-
 dt_format = "%m/%d/%y %H:%M:%S"
+
+
+# Functions ---------------------------------------------------------------
+
+get_dusk_dawn <- function(x, y) {
+  dusk <- vebird$nautical_dusk[1]
+  dusk <- dusk - hours(1)
+  
+}
 
 # Read and wrangle the data -----------------------------------------------
 
@@ -82,7 +62,7 @@ dt_format = "%m/%d/%y %H:%M:%S"
 
 # Hard-coded file name for testing
 vebird <- read_csv(
-  "output.csv",
+  "two_days_out.csv",
   skip = 1,
   col_names = c("season", "year", "detector", "species", "site", "date",
                 "recording_start", "recording_length", "detection_time",
@@ -128,7 +108,28 @@ vebird <- vebird |>
 # Create a detection time ceiling that should make grouping easier
 
 vebird <- vebird |> 
-  mutate(detection_time_floor = floor_date(real_detection_datetime, "hour"))
+  mutate(start_time = floor_date(real_detection_datetime, "hour"),
+         group_date = floor_date(start_time + hours(12), 'day'))
+
+# Modify first start time of each date to coincide with astronical dusk.
+# do the same for dawn
+vebird <- vebird |>
+  mutate(
+    start_time = if_else(
+      start_time < nautical_dusk,
+      ceiling_date(nautical_dusk, "minute"),
+      start_time
+    ),
+    duration = if_else(
+      start_time == ceiling_date(nautical_dusk, "minute"),
+      as.character(
+        ceiling_date(nautical_dusk, "hour") - ceiling_date(nautical_dusk, "minute")
+      ),
+      "60"
+    )
+  )
+
+
 
 # Use floor to get start time, then add 60 minutes for duration
 # If floor is less than first_dusk (below), then replace with first dusk and
@@ -180,3 +181,44 @@ vebird %>%
 
 
 # Make first rows of eBird checklist format
+
+
+
+# set up data frame. MOVE THIS DOWN
+
+col_a <- c("", "Latitude", "Longitude", "Date", "Start Time", "State",
+           "Country", "Protocol", "Num Observers", "Duration (min)",
+           "All Obs Reported (Y/N)", "Dist Traveled (miles)",
+           "Area Covered (Acres)", "Notes")
+col_b <- c(rep("",14))
+col_c <- c(
+  location_name,
+  latitude,
+  longitude,
+  format(vebird$date[1], "%m/%d/%y"), # this needs to get converted to proper format.Change for each date
+  format(vebird$start_time[1], "%H:%M"), # use either first_dusk or hour
+  state,
+  country,
+  protocol,
+  num_observers,
+  duration, # duration is 60 minutes unless first recording or final recording.
+  all_obs_reported,
+  dist_traveled,
+  area_covered,
+  notes
+)
+
+tibble(col_a, col_b, col_c)
+
+write_csv(
+  tibble(col_a, col_b, col_c), 
+  "for_ebird_import.csv",
+  col_names = FALSE)
+
+
+
+
+
+
+vebird |> group_by(group_date, start_time) |> 
+  summarise(N = n())
