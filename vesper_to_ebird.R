@@ -144,10 +144,18 @@ vebird <- vebird |>
     duration
   ))
 
+<<<<<<< HEAD
 # Create a text string that adds one hour to start time to coincide with
 # eBird's local time format.
 fred <- vebird |> 
   mutate(ebird_start_time = start_time + hours(1))
+=======
+
+# Use floor to get start time, then add 60 minutes for duration
+# If floor is less than first_dusk (below), then replace with first dusk and
+# calculate duration.
+
+>>>>>>> c06b1eabb01e16d18fbffc336d3e9d69604fb8d8
 
 vebird |> 
   group_by(start_time) |> 
